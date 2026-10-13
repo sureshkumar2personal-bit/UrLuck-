@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* Class-based dark mode: the `dark` class is toggled on <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---- Page background per theme (soft off-white / deep navy) ---- */
+body {
+  background:
+    radial-gradient(60rem 60rem at 15% 10%, rgba(124, 92, 255, 0.14), transparent 60%),
+    radial-gradient(50rem 50rem at 90% 90%, rgba(34, 211, 238, 0.12), transparent 55%),
+    #f3f5fa;
+}
+
+html.dark body {
+  background:
+    radial-gradient(60rem 60rem at 15% 10%, rgba(124, 92, 255, 0.22), transparent 60%),
+    radial-gradient(50rem 50rem at 90% 90%, rgba(34, 211, 238, 0.18), transparent 55%),
+    #0b1020;
+}
+
+/* ---- Mobile safeguards: never allow horizontal scrolling, and remove
+   the gray tap highlight on buttons for a native feel ---- */
+html,
+body {
+  overflow-x: hidden;
+}
+
+@supports (overflow: clip) {
+  html,
+  body {
+    overflow-x: clip;
+  }
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- Smooth color transitions when switching themes ---- */
+.theme-smooth,
+.theme-smooth * {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 0.25s;
+  transition-timing-function: ease;
+}
+
+/* ---- Entrance + win animations ---- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+
+@keyframes pop {
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+/* ---- CSS-only confetti ---- */
+.confetti-piece {
+  animation-name: confetti-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+@keyframes confetti-fall {
+  from {
+    transform: translate3d(0, -5vh, 0) rotate(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(var(--drift, 0px), 108vh, 0) rotate(720deg);
+    opacity: 0.85;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti {
+    display: none;
+  }
+}
