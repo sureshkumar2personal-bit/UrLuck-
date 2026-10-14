@@ -8,14 +8,18 @@ import ThemeToggle from "./components/ThemeToggle";
 import {
   DIFFICULTIES,
   DIFFICULTY_ORDER,
+  LOCK_DURATION_MS,
   MAX_ATTEMPTS,
+  clearLockedUntil,
   getInitialTheme,
   loadBestMap,
   loadDifficulty,
+  loadLockedUntil,
   parseGuess,
   randomInt,
   saveBestMap,
   saveDifficulty,
+  saveLockedUntil,
   saveTheme,
 } from "./lib/game";
 import type {
@@ -54,6 +58,14 @@ function winTitle(attemptsUsed: number): string {
   }
 }
 
+function formatLockRemaining(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}h ${m}m ${s}s`;
+}
+
 export default function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [difficulty, setDifficulty] = useState<Difficulty>(loadDifficulty);
@@ -66,6 +78,8 @@ export default function App() {
   const [result, setResult] = useState<FeedbackKind | null>(null);
   const [bestMap, setBestMap] = useState<BestMap>(loadBestMap);
   const [levelOpen, setLevelOpen] = useState(false);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(loadLockedUntil);
+  const [now, setNow] = useState(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);
   const levelWrapRef = useRef<HTMLDivElement>(null);
 
@@ -84,6 +98,10 @@ export default function App() {
     0,
     Math.min(MAX_ATTEMPTS, MAX_ATTEMPTS - fails + (won ? 1 : 0)),
   );
+
+  // Retry lock: 12h after a win or a loss.
+  const lockRemainingMs = (lockedUntil ?? 0) - now;
+  const isLocked = lockedUntil !== null && lockRemainingMs > 0;
 
   // Apply + persist theme on <html> (class-based dark mode).
   useEffect(() => {
@@ -110,7 +128,26 @@ export default function App() {
     };
   }, [levelOpen]);
 
+  // Tick the countdown while locked.
+  useEffect(() => {
+    if (!isLocked) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [isLocked, lockedUntil]);
+
+  // Lock retry for 12h when the game ends (win or 5 failed attempts).
+  useEffect(() => {
+    if (!gameOver) return;
+    if (lockedUntil !== null && lockedUntil > Date.now()) return;
+    const until = Date.now() + LOCK_DURATION_MS;
+    setLockedUntil(until);
+    saveLockedUntil(until);
+  }, [gameOver, lockedUntil]);
+
   function newGame(next: Difficulty) {
+    if (isLocked) return;
+    clearLockedUntil();
+    setLockedUntil(null);
     setSecret(randomInt(DIFFICULTIES[next].max));
     setInput("");
     setHistory([]);
@@ -121,6 +158,7 @@ export default function App() {
 
   function changeDifficulty(next: Difficulty) {
     setLevelOpen(false);
+    if (isLocked) return;
     if (next === difficulty) return;
     setDifficulty(next);
     saveDifficulty(next);
@@ -129,7 +167,7 @@ export default function App() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (gameOver) return;
+    if (gameOver || isLocked) return;
 
     const parsed = parseGuess(input, max);
     if (!parsed.ok) {
@@ -181,18 +219,85 @@ export default function App() {
   }
 
   return (
-    <div className="theme-smooth flex min-h-dvh w-full overflow-x-clip p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] font-sans text-slate-900 sm:p-6 dark:text-slate-100">
+    <div className="theme-smooth relative flex min-h-dvh w-full overflow-x-clip p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] font-sans text-slate-900 sm:p-6 dark:text-slate-100">
       {won && <Confetti />}
       {won && <FlyingNumber value={secret} />}
 
-      <main className="m-auto w-full max-w-md animate-[rise_0.5s_cubic-bezier(0.22,1,0.36,1)_both] rounded-3xl border border-slate-200 bg-white p-5 shadow-xl sm:p-8 dark:border-white/10 dark:bg-white/[0.06] dark:shadow-2xl dark:backdrop-blur-xl">
+      <div
+        aria-hidden="true"
+        className="bg3d-stage pointer-events-none fixed inset-0 z-0 overflow-hidden"
+      >
+        {/* 3D perspective grid floor for depth */}
+        <div className="grid-floor" />
+        {/* soft ambient glows */}
+        <div className="bg-float absolute -top-24 -left-24 h-80 w-80 rounded-full bg-violet-400/25 blur-3xl dark:bg-violet-500/20" />
+        <div
+          className="bg-float absolute top-1/4 -right-28 h-96 w-96 rounded-full bg-cyan-300/25 blur-3xl dark:bg-cyan-400/15"
+          style={{ animationDelay: "-2.5s" }}
+        />
+        {/* floating 3D cubes */}
+        <div className="cube3d-wrap absolute top-[30%] left-[12%]">
+          <div className="cube3d">
+            <div className="face face-front" />
+            <div className="face face-back" />
+            <div className="face face-right" />
+            <div className="face face-left" />
+            <div className="face face-top" />
+            <div className="face face-bottom" />
+          </div>
+        </div>
+        <div
+          className="cube3d-wrap cube3d-small absolute right-[10%] bottom-[12%]"
+          style={{ animationDelay: "-3s" }}
+        >
+          <div className="cube3d">
+            <div className="face face-front" />
+            <div className="face face-back" />
+            <div className="face face-right" />
+            <div className="face face-left" />
+            <div className="face face-top" />
+            <div className="face face-bottom" />
+          </div>
+        </div>
+        {/* many floating numbers — one per grid cell so all stay separate */}
+        {Array.from({ length: 20 }, (_, i) => {
+          const n = ((i * 13 + 7) % 50) + 1;
+          const col = i % 5;
+          const row = Math.floor(i / 5);
+          const left = 2 + col * 19 + ((i * 37) % 9) - 4;
+          const top = 3 + row * 21 + ((i * 53) % 7) - 3;
+          const size = 16 + ((i * 29) % 25);
+          return (
+            <span
+              key={i}
+              className="float-num absolute font-black tabular-nums select-none"
+              style={{
+                left: `${Math.min(93, Math.max(1, left))}%`,
+                top: `${Math.min(88, Math.max(2, top))}%`,
+                fontSize: size,
+                animationDelay: `${-((i * 1.37) % 8)}s`,
+                animationDuration: `${5 + ((i * 47) % 40) / 10}s`,
+              }}
+            >
+              {n}
+            </span>
+          );
+        })}
+      </div>
+
+      <main className="relative z-10 m-auto w-full max-w-md animate-[rise_0.5s_cubic-bezier(0.22,1,0.36,1)_both] rounded-3xl border border-slate-200 bg-white p-5 shadow-xl sm:p-8 dark:border-white/10 dark:bg-white/[0.06] dark:shadow-2xl dark:backdrop-blur-xl">
         <div className="mb-2 flex items-start justify-between gap-3">
           <div>
             <div className="text-4xl leading-none" aria-hidden="true">
               🎯
             </div>
-            <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-[26px]">
-              Secret Number
+            <h1 className="mt-3 leading-none">
+              <span className="block text-[8px] font-medium tracking-widest text-slate-500 uppercase dark:text-slate-400">
+                Secret Number
+              </span>
+              <span className="mt-1 block bg-gradient-to-br from-violet-500 via-fuchsia-500 to-blue-500 bg-clip-text text-[25px] leading-tight font-black tracking-tight text-transparent">
+                Yours Ego
+              </span>
             </h1>
           </div>
           <ThemeToggle
@@ -325,13 +430,13 @@ export default function App() {
             autoComplete="off"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={gameOver}
+            disabled={gameOver || isLocked}
             autoFocus
             className="min-w-0 flex-1 rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3.5 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-50 [appearance:textfield] sm:text-lg dark:border-white/10 dark:bg-black/30 dark:text-slate-100 dark:placeholder:text-slate-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <button
             type="submit"
-            disabled={gameOver || input.trim() === ""}
+            disabled={gameOver || isLocked || input.trim() === ""}
             className="cursor-pointer touch-manipulation rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500 px-5 py-3.5 font-semibold whitespace-nowrap text-white select-none transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45"
           >
             Guess
@@ -354,13 +459,28 @@ export default function App() {
               {used === 1 ? "attempt" : "attempts"}
               {best !== null && ` · Best (${DIFFICULTIES[difficulty].label}): ${best}`}
             </p>
-            <button
-              type="button"
-              onClick={() => newGame(difficulty)}
-              className={`${primaryButton} mt-4`}
-            >
-              Play again
-            </button>
+            {isLocked ? (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  disabled
+                  className={`${primaryButton} cursor-not-allowed opacity-60`}
+                >
+                  🔒 Retry in {formatLockRemaining(lockRemainingMs)}
+                </button>
+                <p className="mt-2 text-xs text-emerald-800 dark:text-emerald-200/80">
+                  Unlocked — retry after 12 hrs.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => newGame(difficulty)}
+                className={`${primaryButton} mt-4`}
+              >
+                Play again
+              </button>
+            )}
           </section>
         ) : lost ? (
           <section
@@ -376,14 +496,38 @@ export default function App() {
             <p className="mt-1 text-sm text-rose-800 dark:text-rose-200/90">
               The secret number was <b>{secret}</b>. Better luck next time!
             </p>
-            <button
-              type="button"
-              onClick={() => newGame(difficulty)}
-              className={`${primaryButton} mt-4`}
-            >
-              Play again
-            </button>
+            {isLocked ? (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  disabled
+                  className={`${primaryButton} cursor-not-allowed opacity-60`}
+                >
+                  🔒 Retry in {formatLockRemaining(lockRemainingMs)}
+                </button>
+                <p className="mt-2 text-xs text-rose-800 dark:text-rose-200/80">
+                  Unlocked — retry after 12 hrs.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => newGame(difficulty)}
+                className={`${primaryButton} mt-4`}
+              >
+                Play again
+              </button>
+            )}
           </section>
+        ) : isLocked ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mt-4 min-h-[52px] rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-center font-semibold text-amber-800 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-100"
+          >
+            🔒 Locked. Retry in {formatLockRemaining(lockRemainingMs)} —
+            unlocked after 12 hrs.
+          </div>
         ) : (
           <div
             role="status"
@@ -399,14 +543,6 @@ export default function App() {
         )}
 
         <GuessHistory history={history} />
-
-        {(won || lost) && (
-          <p className="mt-4 text-center text-xs text-slate-500 dark:text-slate-400">
-            {won
-              ? "Nice work! Play again or try a harder difficulty."
-              : "No waiting — start a new game any time."}
-          </p>
-        )}
       </main>
     </div>
   );

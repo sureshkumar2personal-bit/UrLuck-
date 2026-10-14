@@ -9,12 +9,13 @@
  * - Invalid input (empty, non-integer, out-of-range) and duplicate guesses
  *   never consume an attempt.
  * - Guessing correctly within the limit is a WIN; exhausting all attempts
- *   is a loss. Either way the player can immediately start a new game.
+ *   is a loss. Either way the game locks for 12 hours before retry.
  * - The secret number is intentionally never written to storage.
  * - Best score (fewest attempts in a won game) is tracked separately per
  *   difficulty and survives new games and page refreshes.
+ * - Retry lock (`lockedUntil` timestamp) also survives page refreshes.
  *
- * NOTE: best score, theme and difficulty live in `localStorage`, which is
+ * NOTE: best score, theme, difficulty and retry lock live in `localStorage`, which is
  * convenient but not tamper-proof (users can clear site data). That is
  * acceptable for this casual frontend-only game: there is no lockout or
  * leaderboard to protect.
@@ -35,9 +36,13 @@ export const DIFFICULTY_ORDER: Difficulty[] = ["easy", "medium", "hard"];
 
 export const MAX_ATTEMPTS = 5;
 
+/** Retry lockout after a win or a loss (12 hours). */
+export const LOCK_DURATION_MS = 12 * 60 * 60 * 1000;
+
 const BEST_KEY = "guessnum:best";
 const THEME_KEY = "guessnum:theme";
 const DIFFICULTY_KEY = "guessnum:difficulty";
+const LOCK_KEY = "guessnum:lockedUntil";
 
 export type Theme = "light" | "dark";
 
@@ -96,6 +101,15 @@ function writeStorage(key: string, value: string): void {
   } catch {
     // storage unavailable -> game still works for the session, it just
     // won't persist across reloads.
+  }
+}
+
+function removeStorage(key: string): void {
+  try {
+    if (typeof localStorage === "undefined") return;
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
   }
 }
 
@@ -166,4 +180,20 @@ export function getInitialTheme(): Theme {
 
 export function saveTheme(theme: Theme): void {
   writeStorage(THEME_KEY, theme);
+}
+
+/** Timestamp (ms) when retry unlocks, or null if not locked. */
+export function loadLockedUntil(): number | null {
+  const raw = readStorage(LOCK_KEY);
+  if (raw === null) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function saveLockedUntil(timestamp: number): void {
+  writeStorage(LOCK_KEY, String(timestamp));
+}
+
+export function clearLockedUntil(): void {
+  removeStorage(LOCK_KEY);
 }
