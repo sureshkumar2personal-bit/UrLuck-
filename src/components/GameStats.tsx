@@ -1,6 +1,5 @@
 interface Props {
   used: number;
-  remaining: number;
   max: number;
   best: number | null;
 }
@@ -13,25 +12,16 @@ const labelClass =
 
 const valueClass = "mt-1 block text-lg tabular-nums sm:text-xl";
 
-export default function GameStats({ used, remaining, max, best }: Props) {
+export default function GameStats({ used, max, best }: Props) {
   return (
-    <div className="my-5 grid grid-cols-3 gap-2 sm:gap-3" aria-label="Game statistics">
+    <div
+      className="my-5 grid grid-cols-2 gap-2 sm:gap-3"
+      aria-label="Game statistics"
+    >
       <div className={cardClass}>
         <span className={labelClass}>Used</span>
         <strong className={`${valueClass} text-slate-900 dark:text-slate-100`}>
           {used}/{max}
-        </strong>
-      </div>
-      <div className={cardClass}>
-        <span className={labelClass}>Remaining</span>
-        <strong
-          className={`${valueClass} ${
-            remaining === 0
-              ? "text-rose-600 dark:text-rose-300"
-              : "text-slate-900 dark:text-slate-100"
-          }`}
-        >
-          {remaining}
         </strong>
       </div>
       <div className={cardClass}>

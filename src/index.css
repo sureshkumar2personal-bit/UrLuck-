@@ -77,8 +77,121 @@ button {
   }
 }
 
+/* ---- Flying butterfly number (win celebration, bird-like flight) ---- */
+.flying-track {
+  animation: fly-across 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+.flying-bob {
+  animation: fly-bob 0.9s ease-in-out infinite;
+}
+
+/* Butterfly: number is the body, CSS wings left + right, tips pointing UP. */
+.bfly {
+  display: flex;
+  align-items: flex-start;
+  perspective: 320px;
+  filter: drop-shadow(0 12px 20px rgba(124, 92, 255, 0.45));
+}
+
+.bfly-body {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3rem;
+  height: 3.6rem;
+  margin-top: 2.4rem;
+  padding: 0 0.65rem;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #3b2b20 0%, #6b4a2f 55%, #2d2018 100%);
+  color: #fff;
+  font-size: 1.6rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  border: 2px solid rgba(255, 255, 255, 0.65);
+}
+
+.bfly-wing {
+  width: 3.2rem;
+  height: 4.2rem;
+  background:
+    radial-gradient(circle at 32% 30%, rgba(255, 255, 255, 0.95) 0 8%, transparent 9%),
+    radial-gradient(circle at 68% 55%, rgba(255, 255, 255, 0.85) 0 6%, transparent 7%),
+    radial-gradient(circle at 40% 72%, rgba(255, 255, 255, 0.7) 0 5%, transparent 6%),
+    linear-gradient(135deg, #fbbf24 0%, #fb7185 45%, #a78bfa 100%);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+}
+
+.bfly-wing-left {
+  border-radius: 95% 12% 25% 70%;
+  margin-right: -0.7rem;
+  transform-origin: right bottom;
+  animation: butterfly-left 0.38s ease-in-out infinite;
+}
+
+.bfly-wing-right {
+  border-radius: 12% 95% 70% 25%;
+  margin-left: -0.7rem;
+  transform-origin: left bottom;
+  animation: butterfly-right 0.38s ease-in-out infinite;
+}
+
+/* Whole-page loop: top → right → bottom → left, always fully visible. */
+@keyframes fly-across {
+  0% {
+    transform: translate3d(5vw, 6vh, 0) rotate(-6deg);
+  }
+  25% {
+    transform: translate3d(70vw, 10vh, 0) rotate(6deg);
+  }
+  50% {
+    transform: translate3d(66vw, 78vh, 0) rotate(-6deg);
+  }
+  75% {
+    transform: translate3d(4vw, 74vh, 0) rotate(5deg);
+  }
+  100% {
+    transform: translate3d(5vw, 6vh, 0) rotate(-6deg);
+  }
+}
+
+/* Quick flutter bob, like wingbeats lifting the body. */
+@keyframes fly-bob {
+  0%,
+  100% {
+    transform: translateY(-7px) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(7px) rotate(3deg);
+  }
+}
+
+/* Butterfly wings flap upward in 3D, tips pointing UP like a real butterfly. */
+@keyframes butterfly-left {
+  0%,
+  100% {
+    transform: rotate(-32deg) rotateY(55deg);
+  }
+  50% {
+    transform: rotate(-32deg) rotateY(-12deg);
+  }
+}
+
+@keyframes butterfly-right {
+  0%,
+  100% {
+    transform: rotate(32deg) rotateY(-55deg);
+  }
+  50% {
+    transform: rotate(32deg) rotateY(12deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .confetti {
+  .confetti,
+  .flying-number {
     display: none;
   }
 }
