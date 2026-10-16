@@ -21,49 +21,26 @@
  * leaderboard to protect.
  */
 
-export type Difficulty = "easy" | "medium" | "hard";
-
-export const DIFFICULTIES: Record<
-  Difficulty,
-  { label: string; max: number; hint: string }
-> = {
+const DIFFICULTIES = {
   easy: { label: "Easy", max: 10, hint: "1–10" },
   medium: { label: "Medium", max: 25, hint: "1–25" },
   hard: { label: "Hard", max: 50, hint: "1–50" },
 };
 
-export const DIFFICULTY_ORDER: Difficulty[] = ["easy", "medium", "hard"];
+const DIFFICULTY_ORDER = ["easy", "medium", "hard"];
 
-export const MAX_ATTEMPTS = 5;
+const MAX_ATTEMPTS = 5;
 
 /** Retry lockout after a win or a loss (12 hours). */
-export const LOCK_DURATION_MS = 12 * 60 * 60 * 1000;
+const LOCK_DURATION_MS = 12 * 60 * 60 * 1000;
 
 const BEST_KEY = "guessnum:best";
 const THEME_KEY = "guessnum:theme";
 const DIFFICULTY_KEY = "guessnum:difficulty";
 const LOCK_KEY = "guessnum:lockedUntil";
 
-export type Theme = "light" | "dark";
-
-export type GuessResult = "low" | "high" | "win";
-
-export interface GuessEntry {
-  value: number;
-  result: GuessResult;
-}
-
-export type ParseError = "empty" | "not-integer" | "out-of-range";
-
-export type ParseOutcome =
-  | { ok: true; value: number }
-  | { ok: false; error: ParseError };
-
-/** Best score per difficulty: fewest attempts in a won game. */
-export type BestMap = Partial<Record<Difficulty, number>>;
-
 /** Cryptographically random integer in [1, max]. Never stored. */
-export function randomInt(max: number): number {
+function randomInt(max) {
   const buf = new Uint32Array(1);
   crypto.getRandomValues(buf);
   return (buf[0] % max) + 1;
@@ -73,10 +50,7 @@ export function randomInt(max: number): number {
  * Validate raw input. Only whole numbers within range are accepted.
  * Anything else is rejected WITHOUT consuming an attempt.
  */
-export function parseGuess(
-  raw: string,
-  max: number = DIFFICULTIES.hard.max,
-): ParseOutcome {
+function parseGuess(raw, max = DIFFICULTIES.hard.max) {
   const trimmed = raw.trim();
   if (trimmed === "") return { ok: false, error: "empty" };
   const value = Number(trimmed);
@@ -85,16 +59,16 @@ export function parseGuess(
   return { ok: true, value };
 }
 
-function readStorage(key: string): string | null {
+function readStorage(key) {
   try {
     if (typeof localStorage === "undefined") return null;
     return localStorage.getItem(key);
   } catch {
-    return null; // storage unavailable (e.g. private mode) -> treat as empty
+    return null;
   }
 }
 
-function writeStorage(key: string, value: string): void {
+function writeStorage(key, value) {
   try {
     if (typeof localStorage === "undefined") return;
     localStorage.setItem(key, value);
@@ -104,7 +78,7 @@ function writeStorage(key: string, value: string): void {
   }
 }
 
-function removeStorage(key: string): void {
+function removeStorage(key) {
   try {
     if (typeof localStorage === "undefined") return;
     localStorage.removeItem(key);
@@ -113,7 +87,7 @@ function removeStorage(key: string): void {
   }
 }
 
-function isValidScore(n: unknown): n is number {
+function isValidScore(n) {
   return typeof n === "number" && Number.isInteger(n) && n > 0;
 }
 
@@ -121,47 +95,46 @@ function isValidScore(n: unknown): n is number {
  * Load best scores per difficulty. Migrates the legacy single-number format
  * (from when the game was fixed 1-50) to the "hard" slot.
  */
-export function loadBestMap(): BestMap {
+function loadBestMap() {
   const raw = readStorage(BEST_KEY);
   if (raw === null) return {};
   try {
-    const parsed: unknown = JSON.parse(raw);
+    const parsed = JSON.parse(raw);
     if (typeof parsed === "number") {
       return isValidScore(parsed) ? { hard: parsed } : {};
     }
     if (parsed !== null && typeof parsed === "object") {
-      const map: BestMap = {};
+      const map = {};
       for (const key of DIFFICULTY_ORDER) {
-        const v = (parsed as Record<string, unknown>)[key];
+        const v = parsed[key];
         if (isValidScore(v)) map[key] = v;
       }
       return map;
     }
   } catch {
-    // Legacy plain-string number ("3") or corrupt data.
     const n = Number(raw);
     if (isValidScore(n)) return { hard: n };
   }
   return {};
 }
 
-export function saveBestMap(map: BestMap): void {
+function saveBestMap(map) {
   writeStorage(BEST_KEY, JSON.stringify(map));
 }
 
 /** Saved difficulty, defaulting to hard (the original 1-50 game). */
-export function loadDifficulty(): Difficulty {
+function loadDifficulty() {
   const saved = readStorage(DIFFICULTY_KEY);
   if (saved === "easy" || saved === "medium" || saved === "hard") return saved;
   return "hard";
 }
 
-export function saveDifficulty(difficulty: Difficulty): void {
+function saveDifficulty(difficulty) {
   writeStorage(DIFFICULTY_KEY, difficulty);
 }
 
 /** Saved theme, else the OS preference. Defaults to dark when undecidable. */
-export function getInitialTheme(): Theme {
+function getInitialTheme() {
   const saved = readStorage(THEME_KEY);
   if (saved === "light" || saved === "dark") return saved;
   try {
@@ -178,22 +151,40 @@ export function getInitialTheme(): Theme {
   return "dark";
 }
 
-export function saveTheme(theme: Theme): void {
+function saveTheme(theme) {
   writeStorage(THEME_KEY, theme);
 }
 
 /** Timestamp (ms) when retry unlocks, or null if not locked. */
-export function loadLockedUntil(): number | null {
+function loadLockedUntil() {
   const raw = readStorage(LOCK_KEY);
   if (raw === null) return null;
   const n = Number(raw);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export function saveLockedUntil(timestamp: number): void {
+function saveLockedUntil(timestamp) {
   writeStorage(LOCK_KEY, String(timestamp));
 }
 
-export function clearLockedUntil(): void {
+function clearLockedUntil() {
   removeStorage(LOCK_KEY);
 }
+
+export {
+  DIFFICULTIES,
+  DIFFICULTY_ORDER,
+  MAX_ATTEMPTS,
+  LOCK_DURATION_MS,
+  clearLockedUntil,
+  getInitialTheme,
+  loadBestMap,
+  loadDifficulty,
+  loadLockedUntil,
+  parseGuess,
+  randomInt,
+  saveBestMap,
+  saveDifficulty,
+  saveLockedUntil,
+  saveTheme,
+};

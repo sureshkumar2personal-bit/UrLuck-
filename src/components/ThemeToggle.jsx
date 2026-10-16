@@ -1,10 +1,3 @@
-import type { Theme } from "../lib/game";
-
-interface Props {
-  theme: Theme;
-  onToggle: () => void;
-}
-
 function SunIcon() {
   return (
     <svg
@@ -13,6 +6,7 @@ function SunIcon() {
       stroke="currentColor"
       strokeWidth={2}
       strokeLinecap="round"
+      strokeLinejoin="round"
       className="h-5 w-5"
       aria-hidden="true"
     >
@@ -39,7 +33,7 @@ function MoonIcon() {
   );
 }
 
-export default function ThemeToggle({ theme, onToggle }: Props) {
+export default function ThemeToggle({ theme, onToggle }) {
   const dark = theme === "dark";
   return (
     <button

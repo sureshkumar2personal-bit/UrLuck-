@@ -1,5 +1,5 @@
 /** Winning number as a butterfly body, with left + right wings. */
-export default function FlyingNumber({ value }: { value: number }) {
+export default function FlyingNumber({ value }) {
   return (
     <div
       aria-hidden="true"

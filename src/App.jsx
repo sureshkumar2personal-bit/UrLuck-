@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
 import Confetti from "./components/Confetti";
 import FlyingNumber from "./components/FlyingNumber";
 import GameStats from "./components/GameStats";
@@ -22,17 +21,8 @@ import {
   saveLockedUntil,
   saveTheme,
 } from "./lib/game";
-import type {
-  BestMap,
-  Difficulty,
-  GuessEntry,
-  GuessResult,
-  Theme,
-} from "./lib/game";
 
-type FeedbackKind = GuessResult | "error";
-
-const feedbackStyles: Record<FeedbackKind, string> = {
+const feedbackStyles = {
   low: "border-sky-300 bg-sky-50 text-sky-800 dark:border-sky-400/40 dark:bg-sky-400/10 dark:text-sky-100",
   high: "border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-400/40 dark:bg-rose-400/10 dark:text-rose-100",
   win: "border-emerald-400 bg-emerald-50 text-emerald-800 animate-[pop_0.35s_ease] dark:border-emerald-400/50 dark:bg-emerald-400/15 dark:text-emerald-100",
@@ -43,7 +33,7 @@ const feedbackStyles: Record<FeedbackKind, string> = {
 const primaryButton =
   "w-full cursor-pointer touch-manipulation rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500 py-3.5 font-semibold text-white select-none transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 active:translate-y-px";
 
-function winTitle(attemptsUsed: number): string {
+function winTitle(attemptsUsed) {
   switch (attemptsUsed) {
     case 1:
       return "Brilliant! Today is yours — peak guessing! 🔥";
@@ -58,7 +48,7 @@ function winTitle(attemptsUsed: number): string {
   }
 }
 
-function formatLockRemaining(ms: number): string {
+function formatLockRemaining(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
@@ -67,23 +57,23 @@ function formatLockRemaining(ms: number): string {
 }
 
 export default function App() {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
-  const [difficulty, setDifficulty] = useState<Difficulty>(loadDifficulty);
-  const [secret, setSecret] = useState<number>(() =>
+  const [theme, setTheme] = useState(getInitialTheme);
+  const [difficulty, setDifficulty] = useState(loadDifficulty);
+  const [secret, setSecret] = useState(() =>
     randomInt(DIFFICULTIES[loadDifficulty()].max),
   );
   const [input, setInput] = useState("");
-  const [history, setHistory] = useState<GuessEntry[]>([]);
+  const [history, setHistory] = useState([]);
   const [feedback, setFeedback] = useState("");
-  const [result, setResult] = useState<FeedbackKind | null>(null);
-  const [bestMap, setBestMap] = useState<BestMap>(loadBestMap);
+  const [result, setResult] = useState(null);
+  const [bestMap, setBestMap] = useState(loadBestMap);
   const [levelOpen, setLevelOpen] = useState(false);
   const [dayOpen, setDayOpen] = useState(false);
-  const [lockedUntil, setLockedUntil] = useState<number | null>(loadLockedUntil);
+  const [lockedUntil, setLockedUntil] = useState(loadLockedUntil);
   const [now, setNow] = useState(() => Date.now());
-  const inputRef = useRef<HTMLInputElement>(null);
-  const levelWrapRef = useRef<HTMLDivElement>(null);
-  const dayWrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef(null);
+  const levelWrapRef = useRef(null);
+  const dayWrapRef = useRef(null);
 
   const max = DIFFICULTIES[difficulty].max;
   const best = bestMap[difficulty] ?? null;
@@ -93,33 +83,28 @@ export default function App() {
   const lost = !won && used >= MAX_ATTEMPTS;
   const gameOver = won || lost;
 
-  // Lives: start full (all red). Each failed guess turns one red -> white.
-  // A correct guess restores +1 life (capped at MAX_ATTEMPTS).
   const fails = won ? used - 1 : used;
   const livesRed = Math.max(
     0,
     Math.min(MAX_ATTEMPTS, MAX_ATTEMPTS - fails + (won ? 1 : 0)),
   );
 
-  // Retry lock: 12h after a win or a loss.
   const lockRemainingMs = (lockedUntil ?? 0) - now;
   const isLocked = lockedUntil !== null && lockRemainingMs > 0;
 
-  // Apply + persist theme on <html> (class-based dark mode).
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     saveTheme(theme);
   }, [theme]);
 
-  // Close the Level menu on outside click / Escape (click-to-toggle only).
   useEffect(() => {
     if (!levelOpen) return;
-    function onPointerDown(e: PointerEvent) {
-      if (!levelWrapRef.current?.contains(e.target as Node)) {
+    function onPointerDown(e) {
+      if (!levelWrapRef.current?.contains(e.target)) {
         setLevelOpen(false);
       }
     }
-    function onKeyDown(e: KeyboardEvent) {
+    function onKeyDown(e) {
       if (e.key === "Escape") setLevelOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
@@ -130,15 +115,14 @@ export default function App() {
     };
   }, [levelOpen]);
 
-  // Close the day-mood popup on outside click / Escape.
   useEffect(() => {
     if (!dayOpen) return;
-    function onPointerDown(e: PointerEvent) {
-      if (!dayWrapRef.current?.contains(e.target as Node)) {
+    function onPointerDown(e) {
+      if (!dayWrapRef.current?.contains(e.target)) {
         setDayOpen(false);
       }
     }
-    function onKeyDown(e: KeyboardEvent) {
+    function onKeyDown(e) {
       if (e.key === "Escape") setDayOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
@@ -149,14 +133,12 @@ export default function App() {
     };
   }, [dayOpen]);
 
-  // Tick the countdown while locked.
   useEffect(() => {
     if (!isLocked) return;
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [isLocked, lockedUntil]);
 
-  // Lock retry for 12h when the game ends (win or 5 failed attempts).
   useEffect(() => {
     if (!gameOver) return;
     if (lockedUntil !== null && lockedUntil > Date.now()) return;
@@ -165,7 +147,7 @@ export default function App() {
     saveLockedUntil(until);
   }, [gameOver, lockedUntil]);
 
-  function newGame(next: Difficulty) {
+  function newGame(next) {
     if (isLocked) return;
     clearLockedUntil();
     setLockedUntil(null);
@@ -177,7 +159,7 @@ export default function App() {
     inputRef.current?.focus();
   }
 
-  function changeDifficulty(next: Difficulty) {
+  function changeDifficulty(next) {
     setLevelOpen(false);
     if (isLocked) return;
     if (next === difficulty) return;
@@ -186,7 +168,7 @@ export default function App() {
     newGame(next);
   }
 
-  function handleSubmit(e: FormEvent) {
+  function handleSubmit(e) {
     e.preventDefault();
     if (gameOver || isLocked) return;
 
@@ -205,7 +187,6 @@ export default function App() {
 
     const guess = parsed.value;
     if (history.some((entry) => entry.value === guess)) {
-      // Duplicate guesses never consume an attempt.
       setResult("error");
       setFeedback(`You already guessed ${guess}. Try a different number.`);
       setInput("");
@@ -225,7 +206,7 @@ export default function App() {
         saveBestMap(next);
       }
     } else {
-      const outcome: GuessResult = guess > secret ? "high" : "low";
+      const outcome = guess > secret ? "high" : "low";
       setResult(outcome);
       setFeedback(
         outcome === "high"
@@ -248,15 +229,12 @@ export default function App() {
         aria-hidden="true"
         className="bg3d-stage pointer-events-none fixed inset-0 z-0 overflow-hidden"
       >
-        {/* 3D perspective grid floor for depth */}
         <div className="grid-floor" />
-        {/* soft ambient glows */}
         <div className="bg-float absolute -top-24 -left-24 h-80 w-80 rounded-full bg-violet-400/25 blur-3xl dark:bg-violet-500/20" />
         <div
           className="bg-float absolute top-1/4 -right-28 h-96 w-96 rounded-full bg-cyan-300/25 blur-3xl dark:bg-cyan-400/15"
           style={{ animationDelay: "-2.5s" }}
         />
-        {/* floating 3D cubes */}
         <div className="cube3d-wrap absolute top-[30%] left-[12%]">
           <div className="cube3d">
             <div className="face face-front" />
@@ -280,7 +258,6 @@ export default function App() {
             <div className="face face-bottom" />
           </div>
         </div>
-        {/* many floating numbers — one per grid cell so all stay separate */}
         {Array.from({ length: 20 }, (_, i) => {
           const n = ((i * 13 + 7) % 50) + 1;
           const col = i % 5;

@@ -1,22 +1,16 @@
-import type { GuessEntry, GuessResult } from "../lib/game";
-
-interface Props {
-  history: GuessEntry[];
-}
-
-const chipStyles: Record<GuessResult, string> = {
+const chipStyles = {
   low: "border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-400/40 dark:bg-transparent dark:text-sky-300",
   high: "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-400/40 dark:bg-transparent dark:text-rose-300",
   win: "border-emerald-400 bg-emerald-50 text-emerald-700 dark:border-emerald-400/50 dark:bg-transparent dark:text-emerald-300",
 };
 
-const marker: Record<GuessResult, string> = {
+const marker = {
   low: " ▲ too low",
   high: " ▼ too high",
   win: " ✓",
 };
 
-export default function GuessHistory({ history }: Props) {
+export default function GuessHistory({ history }) {
   if (history.length === 0) return null;
   return (
     <div className="mt-4">
@@ -25,7 +19,6 @@ export default function GuessHistory({ history }: Props) {
       </p>
       <div className="flex flex-wrap gap-2">
         {history.map((entry, i) => {
-          // history is newest-first, so attempt #1 is at the last index
           const attemptNum = history.length - i;
           return (
             <span

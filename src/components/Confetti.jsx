@@ -10,19 +10,9 @@ const COLORS = [
   "#f472b6",
 ];
 
-interface Piece {
-  left: number;
-  delay: number;
-  duration: number;
-  size: number;
-  color: string;
-  round: boolean;
-  drift: number;
-}
-
 /** Lightweight CSS-only confetti. No dependencies, pointer-transparent. */
-export default function Confetti({ count = 70 }: { count?: number }) {
-  const pieces = useMemo<Piece[]>(
+export default function Confetti({ count = 70 }) {
+  const pieces = useMemo(
     () =>
       Array.from({ length: count }, (_, i) => ({
         left: (i * 97.3 + 13) % 100,
@@ -50,7 +40,7 @@ export default function Confetti({ count = 70 }: { count?: number }) {
             height: p.round ? p.size : p.size * 0.6,
             backgroundColor: p.color,
             borderRadius: p.round ? "50%" : 2,
-            ["--drift" as string]: `${p.drift}px`,
+            "--drift": `${p.drift}px`,
             animationDelay: `${p.delay}s`,
             animationDuration: `${p.duration}s`,
           }}

@@ -1,9 +1,3 @@
-interface Props {
-  used: number;
-  max: number;
-  best: number | null;
-}
-
 const cardClass =
   "min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 px-2 py-3 text-center sm:px-4 dark:border-white/10 dark:bg-white/[0.04]";
 
@@ -12,7 +6,7 @@ const labelClass =
 
 const valueClass = "mt-1 block text-lg tabular-nums sm:text-xl";
 
-export default function GameStats({ used, max, best }: Props) {
+export default function GameStats({ used, max, best }) {
   return (
     <div
       className="my-5 grid grid-cols-2 gap-2 sm:gap-3"
