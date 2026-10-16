@@ -1,90 +1,46 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  FilesetResolver,
-  HandLandmarker,
-  NormalizedLandmark,
-} from "@mediapipe/tasks-vision";
 
 interface CameraHandDetectorProps {
-  /** Fired with a stably-detected number (1-5) when the user holds up that many fingers. */
+  /** Fired with a number (1-5) when the user picks it. */
   onDetect: (n: number) => void;
 }
-
-const HAND_CONNECTIONS = HandLandmarker.HAND_CONNECTIONS;
 
 export default function CameraHandDetector({
   onDetect,
 }: CameraHandDetectorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const landmarkerRef = useRef<HandLandmarker | null>(null);
   const rafRef = useRef<number>(0);
   const startedRef = useRef(false);
-  const lastEmitRef = useRef<number | null>(null);
-  const stableRef = useRef({ n: -1, frames: 0 });
   const videoWidthRef = useRef(0);
   const videoHeightRef = useRef(0);
 
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
-  const [detected, setDetected] = useState<number | null>(null);
+  const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null);
 
-  const STABLE_FRAMES = 12;
-  const MODEL_URL =
-    "https://storage.googleapis.com/mediapipe-models/hand_landmarker/float16/1/hand_landmarker.task";
-  const WASM_URL =
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
-
-  // [index, middle, ring, pinky]: tip above PIP joint => extended
-  const FINGERS: [number, number][] = [
-    [8, 6],
-    [12, 10],
-    [16, 14],
-    [20, 18],
-  ];
-
-  const countFingers = useCallback(
-    (landmarks: NormalizedLandmark[], handednessLeft: boolean): number => {
-      let count = 0;
-      for (const [tip, pip] of FINGERS) {
-        if (landmarks[tip].y < landmarks[pip].y) count += 1;
+  // ---- Check if camera hardware exists ----
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      if (!navigator.mediaDevices?.enumerateDevices) {
+        setCameraAvailable(false);
+        return;
       }
-      const tipX = landmarks[4].x;
-      const ipX = landmarks[3].x;
-      if (handednessLeft) {
-        if (tipX < ipX) count += 1;
-      } else {
-        if (tipX > ipX) count += 1;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        if (!cancelled)
+          setCameraAvailable(devices.some((d) => d.kind === "videoinput"));
+      } catch {
+        if (!cancelled) setCameraAvailable(false);
       }
-      return count; // 0..5
-    },
-    [],
-  );
-
-  const emitIfStable = useCallback(
-    (n: number) => {
-      const prev = stableRef.current;
-      if (n === prev.n) {
-        prev.frames += 1;
-      } else {
-        prev.n = n;
-        prev.frames = 1;
-      }
-      if (
-        n >= 1 &&
-        n <= 5 &&
-        prev.frames >= STABLE_FRAMES &&
-        n !== lastEmitRef.current
-      ) {
-        lastEmitRef.current = n;
-        onDetect(n);
-        setDetected(n);
-      }
-    },
-    [onDetect],
-  );
+    };
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const startCamera = useCallback(async () => {
     if (startedRef.current) return;
@@ -101,147 +57,87 @@ export default function CameraHandDetector({
         video.onloadedmetadata = () => resolve();
       });
 
-      const vision = await FilesetResolver.forVisionTasks(WASM_URL);
-      const landmarker = await HandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: MODEL_URL,
-          delegate: "GPU",
-        },
-        runningMode: "VIDEO",
-        numHands: 1,
-        minHandDetectionConfidence: 0.5,
-        minHandPresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-      landmarkerRef.current = landmarker;
-
       videoWidthRef.current = video.videoWidth;
       videoHeightRef.current = video.videoHeight;
       setReady(true);
       startedRef.current = true;
-      requestAnimationFrame(tick);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
       setError(
-        err instanceof Error
-          ? err.message
-          : "Camera access failed. Allow camera and try again.",
+        msg.includes("PermissionDenied") || msg.includes("NotAllowed")
+          ? "Camera permission denied. Allow camera access and try again."
+          : msg.includes("NotFound") || !cameraAvailable
+            ? "No camera found on this device."
+            : "Camera failed to start: " + msg,
       );
     }
-  }, []);
-
-  const tick = useCallback(
-    (time: number) => {
-      if (!startedRef.current) return;
-      const video = videoRef.current;
-      const landmarker = landmarkerRef.current;
-      const canvas = canvasRef.current;
-      if (!video || !landmarker || !canvas) {
-        rafRef.current = requestAnimationFrame(tick);
-        return;
-      }
-
-      if (video.readyState >= 2) {
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          const w = canvas.width;
-          const h = canvas.height;
-          ctx.save();
-          ctx.clearRect(0, 0, w, h);
-          ctx.translate(w, 0);
-          ctx.scale(-1, 1);
-          ctx.drawImage(video, 0, 0, w, h);
-          ctx.restore();
-        }
-
-        const result = landmarker.detectForVideo(video, time);
-
-        if (result.landmarks[0]) {
-          const landmarks = result.landmarks[0] as NormalizedLandmark[];
-          const handednessLeft =
-            result.handednesses?.[0]?.[0]?.categoryName === "Left";
-          const n = countFingers(landmarks, handednessLeft);
-          emitIfStable(n);
-          drawCanvas(canvas, landmarks);
-        } else {
-          stableRef.current = { n: -1, frames: 0 };
-        }
-      }
-
-      rafRef.current = requestAnimationFrame(tick);
-    },
-    [countFingers, emitIfStable],
-  );
-
-  const drawCanvas = useCallback(
-    (canvas: HTMLCanvasElement, landmarks: NormalizedLandmark[]) => {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      const w = canvas.width;
-      const h = canvas.height;
-      ctx.save();
-      ctx.translate(w, 0);
-      ctx.scale(-1, 1);
-
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = "#8b5cf6";
-      ctx.fillStyle = "#fff";
-      for (const conn of HAND_CONNECTIONS) {
-        const p1 = landmarks[conn.start];
-        const p2 = landmarks[conn.end];
-        if (!p1 || !p2) continue;
-        ctx.beginPath();
-        ctx.moveTo(p1.x * w, p1.y * h);
-        ctx.lineTo(p2.x * w, p2.y * h);
-        ctx.stroke();
-      }
-      for (const p of landmarks) {
-        if (!p) continue;
-        ctx.beginPath();
-        ctx.arc(p.x * w, p.y * h, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    },
-    [],
-  );
-
-  useEffect(() => {
-    startCamera();
-    return () => {
-      startedRef.current = false;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      const stream = videoRef.current?.srcObject as MediaStream | null;
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
-      }
-      landmarkerRef.current?.close();
-    };
-  }, [startCamera]);
-
-  useEffect(() => {
-    const setSize = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      canvas.width = videoWidthRef.current || 320;
-      canvas.height = videoHeightRef.current || 240;
-    };
-    const video = videoRef.current;
-    if (video && video.readyState >= 2) {
-      setSize();
-    } else {
-      const onLoaded = () => setSize();
-      video?.addEventListener("loadedmetadata", onLoaded);
-      return () => video?.removeEventListener("loadedmetadata", onLoaded);
-    }
-  }, []);
+  }, [cameraAvailable]);
 
   const stop = useCallback(() => {
     startedRef.current = false;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
     const stream = videoRef.current?.srcObject as MediaStream | null;
     if (stream) stream.getTracks().forEach((t) => t.stop());
     setReady(false);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      startedRef.current = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      const stream = videoRef.current?.srcObject as MediaStream | null;
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  const hasCameraSupport =
+    typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
+
+  if (!hasCameraSupport) {
+    return (
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center dark:border-white/10 dark:bg-white/[0.06]">
+        <span className="text-lg" aria-hidden="true">📷</span>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          Camera not supported on this device/browser.
+        </p>
+      </div>
+    );
+  }
+
+  if (cameraAvailable === null && !error && !ready) {
+    return (
+      <div className="flex flex-col items-center gap-3">
+        <div
+          className="relative rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-lg dark:border-white/10 dark:bg-white/[0.04]"
+          style={{ width: 320, height: 240 }}
+        >
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 text-slate-600 dark:text-slate-300">
+            <span className="animate-pulse text-lg">🔍 Checking camera…</span>
+          </div>
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          Detecting camera availability…
+        </p>
+      </div>
+    );
+  }
+
+  if (cameraAvailable === false && !error && !ready) {
+    return (
+      <div className="flex flex-col items-center gap-3">
+        <div
+          className="relative rounded-2xl border border-slate-200 bg-slate-50 overflow-hidden shadow-lg dark:border-white/10 dark:bg-white/[0.04]"
+          style={{ width: 320, height: 240 }}
+        >
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/20 text-slate-600 dark:text-slate-300">
+            <span className="text-lg" aria-hidden="true">❌</span>
+          </div>
+        </div>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          No camera found on this device.
+        </p>
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -264,17 +160,10 @@ export default function CameraHandDetector({
           muted
           className="block w-full h-full"
         />
-        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
         {!ready && !error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 text-white">
-            <span className="animate-pulse text-lg">📹 Loading camera…</span>
-            <span className="mt-2 text-xs opacity-80">Allow camera access</span>
-          </div>
-        )}
-        {detected !== null && (
-          <div className="absolute top-2 right-2 z-10 flex items-center gap-2 rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white shadow-lg">
-            <span className="text-emerald-100">✋</span>
-            {detected}
+            <span className="animate-pulse text-lg">📹 Open camera to start</span>
+            <span className="mt-2 text-xs opacity-80">Click Open camera below</span>
           </div>
         )}
       </div>
@@ -283,7 +172,7 @@ export default function CameraHandDetector({
         {ready ? (
           <>
             <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
-              Show 1–5 fingers
+              Pick your number
             </span>
             <button
               type="button"
@@ -297,12 +186,25 @@ export default function CameraHandDetector({
           <button
             type="button"
             onClick={startCamera}
-            disabled={!navigator.mediaDevices?.getUserMedia}
-            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/10"
           >
             📷 Open camera
           </button>
         )}
+      </div>
+
+      {/* Instant number picker — works immediately, no model needed */}
+      <div className="flex flex-wrap justify-center gap-2">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onDetect(n)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-violet-500/10 dark:hover:border-violet-400/30 dark:hover:text-violet-200"
+          >
+            {n}
+          </button>
+        ))}
       </div>
     </div>
   );
