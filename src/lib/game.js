@@ -36,7 +36,6 @@ const LOCK_DURATION_MS = 12 * 60 * 60 * 1000;
 
 const BEST_KEY = "guessnum:best";
 const THEME_KEY = "guessnum:theme";
-const DIFFICULTY_KEY = "guessnum:difficulty";
 const LOCK_KEY = "guessnum:lockedUntil";
 const HISTORY_KEY = "guessnum:history";
 
@@ -123,15 +122,13 @@ function saveBestMap(map) {
   writeStorage(BEST_KEY, JSON.stringify(map));
 }
 
-/** Saved difficulty, defaulting to hard (the original 1-50 game). */
+/** Always start fresh on Hard (1-50). */
 function loadDifficulty() {
-  const saved = readStorage(DIFFICULTY_KEY);
-  if (saved === "easy" || saved === "medium" || saved === "hard") return saved;
   return "hard";
 }
 
-function saveDifficulty(difficulty) {
-  writeStorage(DIFFICULTY_KEY, difficulty);
+function saveDifficulty() {
+  // difficulty always starts fresh on Hard; nothing to persist
 }
 
 /** Saved theme, else the OS preference. Defaults to dark when undecidable. */

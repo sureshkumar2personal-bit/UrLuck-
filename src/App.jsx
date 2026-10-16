@@ -174,7 +174,6 @@ export default function App() {
     if (isLocked) return;
     if (next === difficulty) return;
     setDifficulty(next);
-    saveDifficulty(next);
     newGame(next);
   }
 
