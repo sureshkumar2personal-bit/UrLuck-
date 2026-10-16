@@ -322,10 +322,38 @@ html.dark .grid-floor {
 /* floating 3D cubes */
 .cube3d-wrap {
   animation: bg-float 6s ease-in-out infinite alternate;
+  /* Pull each cube outward so it sits comfortably outside the centered card.
+     `translate` and `scale` are independent CSS transform properties and
+     compose with the `transform` used by the bg-float animation, so the
+     float animation is preserved exactly as authored. */
+  translate: -24px 0;   /* left cube: nudge further toward the left edge */
+  scale: 0.75;
+  opacity: 0.75;
 }
 
-.cube3d-small {
-  scale: 0.65;
+/* The right cube uses a separate Tailwind class via `cube3d-small`; target
+   it with its sibling selector so we don't need to touch App.tsx.
+   Right cube: push it toward the right edge instead. */
+.cube3d-wrap.cube3d-small {
+  translate: 24px 0;    /* mirrors the left push for the right-side cube */
+  scale: 0.55;          /* already 0.65 in the original; slightly smaller here */
+  opacity: 0.7;
+}
+
+/* ---- Mobile: card fills nearly the full viewport width, so cubes must
+   step back further to avoid overlapping the card panel. ---- */
+@media (max-width: 639px) {
+  .cube3d-wrap {
+    translate: -52px 0;  /* shove left cube close to / behind the left edge */
+    scale: 0.45;
+    opacity: 0.35;
+  }
+
+  .cube3d-wrap.cube3d-small {
+    translate: 52px 0;   /* mirror for the right cube */
+    scale: 0.38;
+    opacity: 0.3;
+  }
 }
 
 .cube3d {
@@ -376,6 +404,20 @@ html.dark .grid-floor {
     transform: rotateX(-22deg) rotateY(360deg);
   }
 }
+
+button[type=submit]:disabled { opacity: 0.6; filter: saturate(0.7); }
+
+/* ---- Gradient headline: violet → fuchsia → blue (left-to-right, slight diagonal).
+   Uses explicit -webkit-background-clip so it works reliably in Tailwind v4 + Vite. ---- */
+.hero-gradient-text {
+  background-image: linear-gradient(135deg, #8b5cf6 0%, #d946ef 50%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.nowrap-hint { white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) {
   .confetti,

@@ -24,22 +24,29 @@ export default function GuessHistory({ history }: Props) {
         Your guesses
       </p>
       <div className="flex flex-wrap gap-2">
-        {history.map((entry, i) => (
-          <span
-            key={`${entry.value}-${i}`}
-            title={
-              entry.result === "win"
-                ? `${entry.value} — correct!`
-                : entry.result === "low"
-                  ? `${entry.value} — too low`
-                  : `${entry.value} — too high`
-            }
-            className={`rounded-full border px-3 py-1 text-[13px] tabular-nums ${chipStyles[entry.result]}`}
-          >
-            {entry.value}
-            <span aria-hidden="true">{marker[entry.result]}</span>
-          </span>
-        ))}
+        {history.map((entry, i) => {
+          // history is newest-first, so attempt #1 is at the last index
+          const attemptNum = history.length - i;
+          return (
+            <span
+              key={`${entry.value}-${i}`}
+              title={
+                entry.result === "win"
+                  ? `#${attemptNum}: ${entry.value} — correct!`
+                  : entry.result === "low"
+                    ? `#${attemptNum}: ${entry.value} — too low`
+                    : `#${attemptNum}: ${entry.value} — too high`
+              }
+              className={`rounded-full border px-3 py-1 text-[13px] tabular-nums ${chipStyles[entry.result]}`}
+            >
+              <span aria-hidden="true" className="mr-1 opacity-50 text-[11px]">
+                {attemptNum}.
+              </span>
+              {entry.value}
+              <span aria-hidden="true">{marker[entry.result]}</span>
+            </span>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import Confetti from "./components/Confetti";
+import CameraHandDetector from "./components/CameraHandDetector";
 import FlyingNumber from "./components/FlyingNumber";
 import GameStats from "./components/GameStats";
 import GuessHistory from "./components/GuessHistory";
@@ -78,10 +79,20 @@ export default function App() {
   const [result, setResult] = useState<FeedbackKind | null>(null);
   const [bestMap, setBestMap] = useState<BestMap>(loadBestMap);
   const [levelOpen, setLevelOpen] = useState(false);
+  const [dayOpen, setDayOpen] = useState(false);
   const [lockedUntil, setLockedUntil] = useState<number | null>(loadLockedUntil);
   const [now, setNow] = useState(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);
   const levelWrapRef = useRef<HTMLDivElement>(null);
+  const dayWrapRef = useRef<HTMLDivElement>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [handNumber, setHandNumber] = useState<number | null>(null);
+
+  const useHandNumber = (n: number) => {
+    setInput(String(n));
+    setHandNumber(n);
+    inputRef.current?.focus();
+  };
 
   const max = DIFFICULTIES[difficulty].max;
   const best = bestMap[difficulty] ?? null;
@@ -127,6 +138,25 @@ export default function App() {
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [levelOpen]);
+
+  // Close the day-mood popup on outside click / Escape.
+  useEffect(() => {
+    if (!dayOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (!dayWrapRef.current?.contains(e.target as Node)) {
+        setDayOpen(false);
+      }
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setDayOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [dayOpen]);
 
   // Tick the countdown while locked.
   useEffect(() => {
@@ -292,10 +322,10 @@ export default function App() {
               🎯
             </div>
             <h1 className="mt-3 leading-none">
-              <span className="block text-[8px] font-medium tracking-widest text-slate-500 uppercase dark:text-slate-400">
+              <span className="block text-[11px] font-medium tracking-[0.18em] text-slate-500 uppercase dark:text-slate-400">
                 Secret Number
               </span>
-              <span className="mt-1 block bg-gradient-to-br from-violet-500 via-fuchsia-500 to-blue-500 bg-clip-text text-[25px] leading-tight font-black tracking-tight text-transparent">
+              <span className="hero-gradient-text mt-1 block text-[25px] leading-tight font-black tracking-tight">
                 Yours Ego
               </span>
             </h1>
@@ -308,14 +338,14 @@ export default function App() {
           />
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-2">
-          <div ref={levelWrapRef} className="relative">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <div ref={levelWrapRef} className="relative min-w-0">
           <button
             type="button"
             aria-haspopup="menu"
             aria-expanded={levelOpen}
             onClick={() => setLevelOpen((o) => !o)}
-            className="inline-flex cursor-pointer touch-manipulation items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-1.5 text-sm select-none transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:bg-white/[0.06] dark:hover:bg-white/10"
+            className="inline-flex shrink-0 cursor-pointer touch-manipulation items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-1.5 text-sm whitespace-nowrap select-none transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:bg-white/[0.06] dark:hover:bg-white/10"
           >
             <span>
               <span className="font-medium text-slate-500 dark:text-slate-400">
@@ -324,7 +354,7 @@ export default function App() {
               <span className="font-bold text-slate-900 dark:text-slate-100">
                 {DIFFICULTIES[difficulty].label}
               </span>{" "}
-              <span className="text-xs tabular-nums text-slate-500 dark:text-slate-400">
+              <span className="whitespace-nowrap text-xs tabular-nums text-slate-500 dark:text-slate-400">
                 ({DIFFICULTIES[difficulty].hint})
               </span>
             </span>
@@ -341,7 +371,7 @@ export default function App() {
           <div
             role="menu"
             aria-label="Difficulty"
-            className={`absolute top-full left-0 z-20 mt-1.5 w-40 origin-top rounded-xl border border-slate-200 bg-white p-1 shadow-lg transition-all duration-150 dark:border-white/10 dark:bg-[#151d33] dark:shadow-2xl ${
+            className={`absolute top-full left-0 z-20 mt-1.5 w-48 origin-top rounded-xl border border-slate-200 bg-white p-1 shadow-lg transition-all duration-150 dark:border-white/10 dark:bg-[#151d33] dark:shadow-2xl ${
               levelOpen
                 ? "visible translate-y-0 opacity-100"
                 : "invisible -translate-y-1 opacity-0"
@@ -368,7 +398,7 @@ export default function App() {
                       {DIFFICULTIES[d].label}
                     </span>
                     <span
-                      className={`block text-[11px] tabular-nums ${
+                      className={`block whitespace-nowrap text-[11px] tabular-nums ${
                         active
                           ? "text-white/85"
                           : "text-slate-500 dark:text-slate-400"
@@ -391,7 +421,7 @@ export default function App() {
           <div
             aria-label={`Life: ${livesRed} of ${MAX_ATTEMPTS} hearts remaining`}
             title={`${livesRed} of ${MAX_ATTEMPTS} hearts remaining`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-1.5 select-none dark:bg-white/[0.06]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-slate-50 px-3 py-1.5 whitespace-nowrap select-none dark:bg-white/[0.06]"
           >
             <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
               Life
@@ -426,7 +456,7 @@ export default function App() {
             inputMode="numeric"
             min={1}
             max={max}
-            placeholder="Your guess"
+            placeholder={`Your guess (1-${max})`}
             autoComplete="off"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -442,6 +472,36 @@ export default function App() {
             Guess
           </button>
         </form>
+
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            disabled={gameOver || isLocked}
+            onClick={() => setCameraOpen((o) => !o)}
+            className={`inline-flex cursor-pointer touch-manipulation items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-semibold transition ${
+              cameraOpen
+                ? "bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-500/10 dark:border-violet-400/30 dark:text-violet-200"
+                : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/10"
+            }`}
+          >
+            {cameraOpen ? "Hide camera" : "🎥 Guess by hand"}
+          </button>
+          {handNumber !== null && (
+            <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-400/10 dark:text-emerald-200">
+              <span aria-hidden="true">✋</span>
+              Detected: <span className="font-black">{handNumber}</span>
+              {handNumber > max && (
+                <span className="text-[10px] opacity-70">(out of range)</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {cameraOpen && (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-white/10 dark:bg-white/[0.06]">
+            <CameraHandDetector onDetect={useHandNumber} />
+          </div>
+        )}
 
         {won ? (
           <section
@@ -529,20 +589,138 @@ export default function App() {
             unlocked after 12 hrs.
           </div>
         ) : (
-          <div
-            role="status"
-            aria-live="polite"
-            className={`mt-4 min-h-[52px] rounded-2xl border px-4 py-3 text-center font-semibold transition ${
-              result
-                ? feedbackStyles[result]
-                : "border-slate-200 bg-slate-50 font-medium text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400"
-            }`}
-          >
-            {feedback || "Make your first guess to begin."}
-          </div>
+          <>
+            {!gameOver && history.length === MAX_ATTEMPTS - 1 && (
+              <div
+                role="status"
+                aria-live="assertive"
+                className={`mt-4 rounded-2xl border px-4 py-3 text-center text-sm font-semibold ${feedbackStyles["error"]}`}
+              >
+                ⚠️ Last attempt — choose carefully!
+              </div>
+            )}
+            <div
+              role="status"
+              aria-live="polite"
+              className={`mt-4 rounded-2xl border px-4 py-3 text-center font-semibold transition ${
+                result
+                  ? `min-h-[52px] ${feedbackStyles[result]}`
+                  : "border-slate-200 bg-slate-50 font-medium text-slate-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-400"
+              }`}
+            >
+              {feedback || "Make your first guess to begin."}
+            </div>
+          </>
         )}
 
         <GuessHistory history={history} />
+
+        <div ref={dayWrapRef} className="relative mt-6">
+          <div className="flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <span>!you can test how is your&apos;s day</span>
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={dayOpen}
+              onClick={() => setDayOpen((o) => !o)}
+              className="inline-flex h-6 w-6 cursor-pointer touch-manipulation items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:text-slate-300 dark:hover:bg-white/10"
+              aria-label="Show how your day goes by attempts"
+            >
+              <span
+                aria-hidden="true"
+                className={`text-sm font-bold transition-transform duration-200 ${
+                  dayOpen ? "rotate-90 text-violet-500" : ""
+                }`}
+              >
+                →
+              </span>
+            </button>
+          </div>
+
+          <div
+            role="dialog"
+            aria-label="How your day goes by attempts"
+            className={`absolute bottom-full left-1/2 z-30 mb-3 w-72 -translate-x-1/2 origin-bottom rounded-2xl border border-slate-200/70 bg-white/85 p-4 text-xs shadow-2xl backdrop-blur-xl transition-all duration-200 dark:border-white/10 dark:bg-[#131a2e]/90 dark:shadow-[0_24px_70px_-18px_rgba(0,0,0,0.65)] ${
+              dayOpen
+                ? "visible translate-y-0 scale-100 opacity-100"
+                : "invisible translate-y-2 scale-95 opacity-0 pointer-events-none"
+            }`}
+          >
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-blue-500 text-sm text-white shadow-md shadow-violet-500/30">
+                📅
+              </span>
+              <div>
+                <p className="text-[13px] font-bold text-slate-900 dark:text-slate-100">
+                  Your day by attempts
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  What each attempt count really means
+                </p>
+              </div>
+            </div>
+
+            <ul className="space-y-2">
+              {[
+                {
+                  n: 1,
+                  emoji: "🔥",
+                  title: "1st attempt",
+                  desc: "Guess everything — peak confidence",
+                  tone: "from-emerald-500 to-teal-500",
+                },
+                {
+                  n: 2,
+                  emoji: "🎉",
+                  title: "2nd attempt",
+                  desc: "Very nice — strong read on it",
+                  tone: "from-sky-500 to-indigo-500",
+                },
+                {
+                  n: 3,
+                  emoji: "✨",
+                  title: "3rd attempt",
+                  desc: "Don't get too excited just yet",
+                  tone: "from-violet-500 to-fuchsia-500",
+                },
+                {
+                  n: 4,
+                  emoji: "😅",
+                  title: "4th attempt",
+                  desc: "Poor chances — but still alive",
+                  tone: "from-amber-500 to-orange-500",
+                },
+                {
+                  n: 5,
+                  emoji: "👀",
+                  title: "5th attempt",
+                  desc: "Don't guess — just see what happens",
+                  tone: "from-rose-500 to-pink-500",
+                },
+              ].map((item) => (
+                <li
+                  key={item.n}
+                  className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2.5 transition hover:border-violet-200 hover:bg-violet-50/60 dark:border-white/5 dark:bg-white/[0.04] dark:hover:border-violet-400/30 dark:hover:bg-violet-500/10"
+                >
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br ${item.tone} text-[13px] font-black text-white shadow-sm`}
+                  >
+                    {item.n}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-800 dark:text-slate-100">
+                      <span aria-hidden="true">{item.emoji}</span>
+                      {item.title}
+                    </p>
+                    <p className="truncate text-[11px] leading-tight text-slate-500 dark:text-slate-400">
+                      {item.desc}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </main>
     </div>
   );

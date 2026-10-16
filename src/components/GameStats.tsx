@@ -5,7 +5,7 @@ interface Props {
 }
 
 const cardClass =
-  "min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-2 py-3 text-center sm:px-4 dark:border-white/10 dark:bg-white/[0.04]";
+  "min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 px-2 py-3 text-center sm:px-4 dark:border-white/10 dark:bg-white/[0.04]";
 
 const labelClass =
   "block truncate text-[9px] font-medium uppercase tracking-wider text-slate-500 sm:text-[11px] sm:tracking-widest dark:text-slate-400";
