@@ -33,8 +33,9 @@ export default function CameraHandDetector({
 
   const STABLE_FRAMES = 12;
   const MODEL_URL =
-    "https://storage.googleapis.com/mediapipe-models/hand_landmarker/float16/latest/hand_landmarker.task";
-  const WASM_URL = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
+    "https://storage.googleapis.com/mediapipe-models/hand_landmarker/float16/1/hand_landmarker.task";
+  const WASM_URL =
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm";
 
   // [index, middle, ring, pinky]: tip above PIP joint => extended
   const FINGERS: [number, number][] = [
