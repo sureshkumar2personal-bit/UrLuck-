@@ -3,6 +3,7 @@ import Confetti from "./components/Confetti";
 import FlyingNumber from "./components/FlyingNumber";
 import GameStats from "./components/GameStats";
 import GuessHistory from "./components/GuessHistory";
+import HistoryPage from "./components/HistoryPage";
 import ThemeToggle from "./components/ThemeToggle";
 import {
   DIFFICULTIES,
@@ -14,6 +15,8 @@ import {
   loadBestMap,
   loadDifficulty,
   loadLockedUntil,
+  loadHistory,
+  addHistoryRecord,
   parseGuess,
   randomInt,
   saveBestMap,
@@ -21,6 +24,7 @@ import {
   saveLockedUntil,
   saveTheme,
 } from "./lib/game";
+import { playWinSound, playWrongSound } from "./lib/sound";
 
 const feedbackStyles = {
   low: "border-sky-300 bg-sky-50 text-sky-800 dark:border-sky-400/40 dark:bg-sky-400/10 dark:text-sky-100",
@@ -57,6 +61,7 @@ function formatLockRemaining(ms) {
 }
 
 export default function App() {
+  const [view, setView] = useState("game"); // 'game' | 'history'
   const [theme, setTheme] = useState(getInitialTheme);
   const [difficulty, setDifficulty] = useState(loadDifficulty);
   const [secret, setSecret] = useState(() =>
@@ -92,11 +97,13 @@ export default function App() {
   const lockRemainingMs = (lockedUntil ?? 0) - now;
   const isLocked = lockedUntil !== null && lockRemainingMs > 0;
 
+  // Theme
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
     saveTheme(theme);
   }, [theme]);
 
+  // Level menu close
   useEffect(() => {
     if (!levelOpen) return;
     function onPointerDown(e) {
@@ -115,6 +122,7 @@ export default function App() {
     };
   }, [levelOpen]);
 
+  // Day popup close
   useEffect(() => {
     if (!dayOpen) return;
     function onPointerDown(e) {
@@ -133,12 +141,14 @@ export default function App() {
     };
   }, [dayOpen]);
 
+  // Lock countdown
   useEffect(() => {
     if (!isLocked) return;
     const id = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(id);
   }, [isLocked, lockedUntil]);
 
+  // Lock retry
   useEffect(() => {
     if (!gameOver) return;
     if (lockedUntil !== null && lockedUntil > Date.now()) return;
@@ -168,6 +178,20 @@ export default function App() {
     newGame(next);
   }
 
+  function saveGameRecord() {
+    const record = {
+      id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
+      date: new Date().toISOString(),
+      secret,
+      difficulty,
+      max,
+      attempts: used,
+      won,
+      guesses: [...history].reverse(), // chronological order
+    };
+    addHistoryRecord(record);
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     if (gameOver || isLocked) return;
@@ -175,6 +199,7 @@ export default function App() {
     const parsed = parseGuess(input, max);
     if (!parsed.ok) {
       setResult("error");
+      playWrongSound();
       if (parsed.error === "empty") {
         setFeedback("Please enter a number first.");
       } else if (parsed.error === "not-integer") {
@@ -188,6 +213,7 @@ export default function App() {
     const guess = parsed.value;
     if (history.some((entry) => entry.value === guess)) {
       setResult("error");
+      playWrongSound();
       setFeedback(`You already guessed ${guess}. Try a different number.`);
       setInput("");
       inputRef.current?.focus();
@@ -198,6 +224,7 @@ export default function App() {
 
     if (guess === secret) {
       setResult("win");
+      playWinSound();
       setFeedback(winTitle(attemptsUsed));
       setHistory((h) => [{ value: guess, result: "win" }, ...h]);
       if (best === null || attemptsUsed < best) {
@@ -205,19 +232,40 @@ export default function App() {
         setBestMap(next);
         saveBestMap(next);
       }
+      saveGameRecord();
     } else {
       const outcome = guess > secret ? "high" : "low";
       setResult(outcome);
+      playWrongSound();
       setFeedback(
         outcome === "high"
           ? "Too high! Try a lower number."
           : "Too low! Try a higher number.",
       );
       setHistory((h) => [{ value: guess, result: outcome }, ...h]);
+      if (lost) {
+        saveGameRecord();
+      }
     }
 
     setInput("");
     inputRef.current?.focus();
+  }
+
+  if (view === "history") {
+    return (
+      <div className="theme-smooth relative flex min-h-dvh w-full overflow-x-clip p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] font-sans text-slate-900 sm:p-6 dark:text-slate-100">
+        <HistoryPage
+          onBack={() => setView("game")}
+          onPlayAgain={(diff) => {
+            setDifficulty(diff);
+            saveDifficulty(diff);
+            newGame(diff);
+            setView("game");
+          }}
+        />
+      </div>
+    );
   }
 
   return (
@@ -298,12 +346,22 @@ export default function App() {
               </span>
             </h1>
           </div>
-          <ThemeToggle
-            theme={theme}
-            onToggle={() =>
-              setTheme((t) => (t === "dark" ? "light" : "dark"))
-            }
-          />
+          <div className="flex items-center gap-2">
+            <ThemeToggle
+              theme={theme}
+              onToggle={() =>
+                setTheme((t) => (t === "dark" ? "light" : "dark"))
+              }
+            />
+            <button
+              type="button"
+              onClick={() => setView("history")}
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300 dark:hover:bg-white/10"
+              aria-label="View game history"
+            >
+              📜 History
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">

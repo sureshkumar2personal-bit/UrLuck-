@@ -38,6 +38,7 @@ const BEST_KEY = "guessnum:best";
 const THEME_KEY = "guessnum:theme";
 const DIFFICULTY_KEY = "guessnum:difficulty";
 const LOCK_KEY = "guessnum:lockedUntil";
+const HISTORY_KEY = "guessnum:history";
 
 /** Cryptographically random integer in [1, max]. Never stored. */
 function randomInt(max) {
@@ -171,6 +172,28 @@ function clearLockedUntil() {
   removeStorage(LOCK_KEY);
 }
 
+/** ---------- Game history (past games) ---------- */
+
+function loadHistory() {
+  const raw = readStorage(HISTORY_KEY);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(history) {
+  writeStorage(HISTORY_KEY, JSON.stringify(history));
+}
+
+function addHistoryRecord(record) {
+  const history = loadHistory();
+  history.unshift(record);
+  saveHistory(history.slice(0, 50));
+}
+
 export {
   DIFFICULTIES,
   DIFFICULTY_ORDER,
@@ -181,6 +204,8 @@ export {
   loadBestMap,
   loadDifficulty,
   loadLockedUntil,
+  loadHistory,
+  addHistoryRecord,
   parseGuess,
   randomInt,
   saveBestMap,
